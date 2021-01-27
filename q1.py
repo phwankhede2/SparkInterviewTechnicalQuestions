@@ -26,20 +26,31 @@
 #|   100|  man1|   [1, 2]|
 #+------+------+---------+
 
+# .\bin\spark-submit q1.py
 
-from pyspark.sql.functions import collect_list
+from pyspark.sql.functions import collect_list,col
 from pyspark.sql.types import IntegerType
+from pyspark.sql import SparkSession
 
-df = spark.read.csv(path=".\employee_details.csv",header=True, sep="|")
-df = df.withColumn('salary', col('salary').cast(IntegerType()))
-# Register df as temp table
-df.registerTempTable("emp_details")
-employees_sal = spark.sql("select deprtmnt, empNo, salary , DENSE_RANK() OVER (partition by deprtmnt ORDER BY salary DESC) RN From emp_details").show()
-employees_with_highest_sal = employees_sal.filter(col('RN')==1)
+if __name__ == "__main__":
+    spark = SparkSession\
+        .builder\
+        .appName("FindEmployeesAssignedToProject")\
+        .getOrCreate()
 
-# Read project details csv
-df2 = spark.read.csv(path="project_details.csv", header=True, sep="|")
-# Join both datasets
-df3 = df2.join(df, 'empNo', 'inner')
-# Final result
-df3.groupBy('projNo','mangNo').agg(collect_list('salary')).withColumnRenamed('collect_list(salary)' , 'employees').show()
+    df = spark.read.csv(path=".\dataset\employee_details.csv",header=True, sep="|")
+    df = df.withColumn('salary', col('salary').cast(IntegerType()))
+    # Register df as temp table
+    df.registerTempTable("emp_details")
+    employees_sal = spark.sql("select deprtmnt, empNo, salary , DENSE_RANK() OVER (partition by deprtmnt ORDER BY salary DESC) RN From emp_details")
+    employees_with_highest_sal = employees_sal.filter(col('RN')==1)
+
+    # Read project details csv
+    df2 = spark.read.csv(path=".\dataset\project_details.csv", header=True, sep="|")
+    # Join both datasets
+    df3 = df2.join(df, 'empNo', 'inner')
+    # Final result
+    df3.groupBy('projNo','mangNo').agg(collect_list('salary')).withColumnRenamed('collect_list(salary)', 'employees').show()
+
+    spark.stop()
+
